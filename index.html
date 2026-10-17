@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#315efb">
+<meta name="description" content="gLab Physics — interactive pendulum experiment calculator for T² against length and gravitational acceleration.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>gLab Physics — Pendulum Lab</title>
+<style>
+:root{--bg:#f3f6fb;--card:#fff;--text:#172033;--muted:#697386;--border:#e2e7f0;--brand:#315efb;--brand2:#13265c;--soft:#edf1ff;--good:#f2fff9;--goodborder:#bce5d5}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.top{background:linear-gradient(135deg,var(--brand2),var(--brand));color:#fff;padding:34px 18px 54px}.wrap{max-width:1120px;margin:auto}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:15px}.brand{font-weight:800;letter-spacing:.04em}.pill{font-size:12px;padding:7px 10px;border-radius:999px;background:#ffffff1c}
+.hero h1{font-size:clamp(30px,5vw,46px);margin:28px 0 8px}.hero p{margin:0;max-width:760px;color:#e9edff}
+.main{padding:0 14px 50px;margin-top:-28px}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;margin:15px 0;box-shadow:0 5px 20px #0000000b}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:750;cursor:pointer;background:var(--brand);color:#fff}.btn:hover{filter:brightness(.96)}.alt{background:var(--soft);color:#244bd0}.danger{background:#fff0f0;color:#b42318}.install{background:#fff;color:#244bd0}
+.status{font-size:13px;color:var(--muted);margin-left:auto}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric{padding:14px;border:1px solid var(--border);border-radius:13px}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{font-size:23px}.green{background:var(--good);border-color:var(--goodborder)}.green strong{color:#137b58}
+.chart{height:420px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}.control{background:#f8f9fc;border-radius:12px;padding:13px}
+.note{font-size:13px;color:var(--muted)}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:10px;border-bottom:1px solid #eee;text-align:right}th:first-child,td:first-child{text-align:left}td[contenteditable]{background:#fbfcff;cursor:text;border-radius:4px}
+.empty{padding:24px;text-align:center;color:var(--muted)}.footer{text-align:center;color:var(--muted);font-size:12px;padding:15px}
+@media(max-width:750px){.grid{grid-template-columns:1fr 1fr}.controls{grid-template-columns:1fr}.chart{height:330px}.status{margin-left:0;width:100%}.top{padding-bottom:45px}}
+@media(max-width:480px){.grid{grid-template-columns:1fr}.card{padding:16px}.btn{flex:1}.hero h1{font-size:31px}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<header class="top">
+<div class="wrap">
+<div class="nav"><div class="brand">GLAB • PHYSICS</div><span class="pill">Pendulum Lab</span></div>
+<div class="hero"><h1>Interactive Pendulum Calculator</h1><p>Enter your measurements, plot T² against length, and determine gravitational acceleration with a best-fit line.</p></div>
+</div>
+</header>
+<main class="wrap main">
+<section class="card"><div class="row">
+<label class="btn" for="file">📁 Import Excel</label><input id="file" type="file" accept=".xlsx,.xls,.csv" hidden>
+<button class="btn alt" onclick="addRow()">＋ Add row</button><button class="btn alt" onclick="resetData()">↻ Reset</button>
+<button class="btn alt" onclick="exportCSV()">⇩ CSV</button><button class="btn alt" onclick="exportJSON()">⇩ Backup</button>
+<button id="installBtn" class="btn install" style="display:none">⬇ Install gLab</button>
+<span class="status" id="status"></span>
+</div></section>
+
+<section class="card"><h2>Results</h2><div class="grid">
+<div class="metric"><span>Gradient</span><strong id="m">—</strong><small> s²/m</small></div>
+<div class="metric"><span>Intercept</span><strong id="c">—</strong><small> s²</small></div>
+<div class="metric"><span>R²</span><strong id="r2">—</strong></div>
+<div class="metric green"><span>Gravitational acceleration</span><strong id="g">—</strong><small> m/s²</small></div>
+</div><p class="note"><b>T² = (4π²/g)l + c</b> → <b>g = 4π² / gradient</b></p></section>
+
+<section class="card"><h2>Interactive graph</h2><div class="controls">
+<div class="control"><b>Best-fit line</b><br><label><input id="lineToggle" type="checkbox" checked onchange="render()"> Show</label></div>
+<div class="control"><b>Origin</b><br><label><input id="originToggle" type="checkbox" onchange="render()"> Show</label></div>
+</div><div class="chart"><canvas id="chart"></canvas></div></section>
+
+<section class="card"><h2>Data editor</h2><p class="note">Edit the blue cells. The app recalculates t average, T = t average ÷ 20, T², gradient, R² and g automatically.</p>
+<div style="overflow:auto"><table><thead><tr><th>l (m)</th><th>t₁ (s)</th><th>t₂ (s)</th><th>t₃ (s)</th><th>t avg (s)</th><th>T (s)</th><th>T² (s²)</th><th>Remove</th></tr></thead><tbody id="tbody"></tbody></table></div></section>
+
+<section class="card"><h2>How to use</h2><ol class="note"><li>Measure the time for 20 oscillations three times.</li><li>Enter length and the three measured times, or import your Excel sheet.</li><li>Check the T² vs l graph and best-fit line.</li><li>Use the calculated gradient to determine g.</li><li>Export a CSV or backup file when finished.</li></ol></section>
+</main>
+<div class="footer">gLab Physics • Interactive laboratory tool</div>
+
+<script>
+const initial=[{"length":0.1,"t1":14.03,"t2":13.86,"t3":14.41},{"length":0.2,"t1":19.32,"t2":18.56,"t3":18.99},{"length":0.3,"t1":22.47,"t2":22.86,"t3":22.56},{"length":0.4,"t1":25.69,"t2":25.93,"t3":26.12},{"length":0.5,"t1":28.0,"t2":28.67,"t3":28.65},{"length":0.6,"t1":31.25,"t2":31.15,"t3":30.98}];
+let data=JSON.parse(JSON.stringify(initial)),chart;
+
+function calc(r){r.taverage=(r.t1+r.t2+r.t3)/3;r.T=r.taverage/20;r.T2=r.T*r.T}
+function reg(a){
+let x=a.map(r=>r.length),y=a.map(r=>r.T2),n=x.length;
+if(n<2)return {m:NaN,c:NaN,r2:NaN,g:NaN};
+let xm=x.reduce((s,v)=>s+v,0)/n,ym=y.reduce((s,v)=>s+v,0)/n,num=0,den=0;
+for(let i=0;i<n;i++){num+=(x[i]-xm)*(y[i]-ym);den+=(x[i]-xm)**2}
+if(den===0)return {m:NaN,c:NaN,r2:NaN,g:NaN};
+let m=num/den,c=ym-m*xm,res=0,total=0;
+for(let i=0;i<n;i++){res+=(y[i]-(m*x[i]+c))**2;total+=(y[i]-ym)**2}
+return {m,c,r2:total?1-res/total:1,g:4*Math.PI*Math.PI/m}
+}
+function render(){
+data.forEach(calc);
+let tb=document.getElementById('tbody');tb.innerHTML='';
+data.forEach((r,i)=>{
+let tr=document.createElement('tr');
+['length','t1','t2','t3','taverage','T','T2'].forEach(k=>{
+let td=document.createElement('td');td.textContent=Number(r[k]).toFixed(4);
+if(['length','t1','t2','t3'].includes(k)){td.contentEditable=true;td.onblur=()=>{let v=parseFloat(td.textContent);if(Number.isFinite(v)){r[k]=v;render()}else render()}}
+tr.appendChild(td)});
+let td=document.createElement('td'),b=document.createElement('button');b.textContent='✕';b.className='btn danger';b.onclick=()=>{data.splice(i,1);render()};td.appendChild(b);tr.appendChild(td);tb.appendChild(tr);
+});
+let q=reg(data);
+document.getElementById('m').textContent=Number.isFinite(q.m)?q.m.toFixed(4):'—';
+document.getElementById('c').textContent=Number.isFinite(q.c)?q.c.toFixed(4):'—';
+document.getElementById('r2').textContent=Number.isFinite(q.r2)?q.r2.toFixed(5):'—';
+document.getElementById('g').textContent=Number.isFinite(q.g)?q.g.toFixed(4):'—';
+if(chart)chart.destroy();
+if(data.length>=2&&Number.isFinite(q.m)){
+let xmin=Math.min(...data.map(r=>r.length)),xmax=Math.max(...data.map(r=>r.length));
+let sets=[{label:'Measurements',data:data.map(r=>({x:r.length,y:r.T2})),showLine:false,pointRadius:6}];
+if(document.getElementById('lineToggle').checked)sets.push({label:'Best-fit line',type:'line',data:[{x:xmin,y:q.m*xmin+q.c},{x:xmax,y:q.m*xmax+q.c}],pointRadius:0,fill:false});
+if(document.getElementById('originToggle').checked)sets.push({label:'Origin',data:[{x:0,y:0}],showLine:false,pointRadius:5});
+chart=new Chart(document.getElementById('chart'),{type:'scatter',data:{datasets:sets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{display:true,text:'Length, l (m)'}},y:{title:{display:true,text:'T² (s²)'}}},plugins:{legend:{position:'bottom'}}}});
+}
+document.getElementById('status').textContent=data.length+' data points';
+}
+function addRow(){data.push({length:0,t1:0,t2:0,t3:0});render()}
+function resetData(){data=JSON.parse(JSON.stringify(initial));render()}
+function exportCSV(){data.forEach(calc);let q=reg(data),s='Length (m),t1,t2,t3,t average,T,T²\n';data.forEach(r=>s+=`${r.length},${r.t1},${r.t2},${r.t3},${r.taverage},${r.T},${r.T2}\n`);s+=`\nGradient,${q.m}\nIntercept,${q.c}\nR²,${q.r2}\ng,${q.g} m/s²`;downloadBlob(s,'pendulum_results.csv','text/csv')}
+function exportJSON(){data.forEach(calc);downloadBlob(JSON.stringify({app:'gLab Physics',version:1,exported:new Date().toISOString(),data},null,2),'glab_experiment_backup.json','application/json')}
+function downloadBlob(s,name,type){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+document.getElementById('file').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}),out=[];for(let i=1;i<rows.length;i++){let r=rows[i],L=parseFloat(r[0]),a=parseFloat(r[1]),b=parseFloat(r[2]),c=parseFloat(r[3]);if([L,a,b,c].every(Number.isFinite))out.push({length:L,t1:a,t2:b,t3:c})}if(out.length){data=out;render()}else alert('No usable rows found. Expected columns: l, t1, t2, t3.')}catch(err){alert('Could not read the Excel file.')}e.target.value=''};
+let deferredInstallPrompt=null,installBtn=document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;installBtn.style.display='inline-block'});
+installBtn.onclick=async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;installBtn.style.display='none'};
+window.addEventListener('appinstalled',()=>installBtn.style.display='none');
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.warn));
+render();
+</script>
+</body></html>
